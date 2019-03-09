@@ -1,4 +1,6 @@
 #include <iostream>
+#include <string>
+#include "utils/InputParser.h"
 
 /*
  * 1. Wlacza sie 1 klient, dostaje null jako adres nastepnego
@@ -16,7 +18,16 @@
  * zawartość ramki jest kasowana, a sama ramka jest z powrotem przekształcana w token.
  */
 
-int main() {
+int main(int argc, char *argv[]) {
     std::cout << "Hello, World!" << std::endl;
+    Input input = InputParser::parseArguments(argc, argv);
+
+    std::cout << input.protocol << std::endl;
+    std::cout << input.neighbourIpAddess << std::endl;
+    std::cout << input.listeningPort << std::endl;
+    std::cout << input.id << std::endl;
+    std::cout << input.doesHaveToken << std::endl;
+
+
     return 0;
 }
