@@ -2,7 +2,10 @@
 // Created by woolfy on 3/9/19.
 //
 
+#include <iostream>
+#include <unistd.h>
 #include "NetUtils.h"
+#include "../Token.h"
 
 int createSocket(Protocol);
 
@@ -21,11 +24,19 @@ int NetUtils::socketForReceiving(Protocol protocol, uint16_t port) {
         throw "Failed to bind socket to port: \n" + std::to_string(port);
     }
 
-    int listenResult = listen(socketFD, 3); // w sumie to cokolwiek wieksze od 1 bo i tak nie powinnismy miec w kolejce wiecej niz 1
+    int listenResult = listen(socketFD, 64); // w sumie to cokolwiek wieksze od 1 bo i tak nie powinnismy miec w kolejce wiecej niz 1
 
     if(listenResult < 0){
         printf("Error code: %s\n", strerror(errno));
         throw "Failed to listen";
+    }
+
+    int addrLen = sizeof(address);
+    socketFD = accept(socketFD, (struct sockaddr *)&address, (socklen_t*)&addrLen);
+
+    if(socketFD < 0) {
+        printf("Error code: %s\n", strerror(errno));
+        throw "Failed to accept";
     }
 
     return socketFD;
@@ -49,9 +60,31 @@ int NetUtils::socketForSending(Protocol protocol, string address, uint16_t port)
     return socketFD;
 }
 
-void NetUtils::sendMessage(int socket) {
+//template<typename D, typename A>
+void NetUtils::sendMessage(int socket, string token) {
+    ssize_t sendResult = write(socket, token.c_str(), token.size());
+
+    if(sendResult != token.size()) {
+        printf("Error code: %s\n", strerror(errno));
+        throw "Failed to send message";
+    }
+}
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+void NetUtils::receiveMessage(int socket) {
+    char dataReceived[1024];
+
+    while(true){
+        ssize_t bytesRead = read(socket, &dataReceived, 1024);
+
+        if(bytesRead > 0){
+            std::cout << dataReceived << std::endl;
+        }
+    }
 
 }
+#pragma clang diagnostic pop
 
 int createSocket(Protocol protocol){
     int socketFD = 0;
@@ -62,7 +95,7 @@ int createSocket(Protocol protocol){
         socketFD = socket(AF_INET, SOCK_DGRAM, 0);
     }
 
-    if(socketFD < 0){
+    if(socketFD <= 0){
         printf("Error code: %s\n", strerror(errno));
         throw "Failed to create socket";
     }

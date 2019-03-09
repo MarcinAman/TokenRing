@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include "utils/InputParser.h"
+#include "utils/NetUtils.h"
 
 /*
  * 1. Wlacza sie 1 klient, dostaje null jako adres nastepnego
@@ -21,8 +22,19 @@
 int main(int argc, char *argv[]) {
     Input input = InputParser::parseArguments(argc, argv);
 
-    std::cout << "Client initialized with parameters:" << std::endl;
+    std::cout << "Initialized with parameters:" << std::endl;
     std::cout << input.toString() << std::endl;
+
+    if(input.doesHaveToken){
+        int socket = NetUtils::socketForReceiving(input.protocol, static_cast<uint16_t>(input.listeningPort));
+        printf("socket: %d\n", socket);
+
+        NetUtils::receiveMessage(socket);
+    } else {
+        int socket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess, static_cast<uint16_t>(input.listeningPort));
+        printf("socket: %d\n", socket);
+        NetUtils::sendMessage(socket, "The most amazing message ever");
+    }
 
     return 0;
 }

@@ -13,12 +13,15 @@
 #include <arpa/inet.h>
 
 #include "InputParser.h"
+#include "../Token.h"
 
 class NetUtils {
     public:
         static int socketForReceiving(Protocol protocol, uint16_t port);
         static int socketForSending(Protocol protocol, string address, uint16_t port);
-        static void sendMessage(int socket);
+//        template <class D, class A>
+        static void sendMessage(int socket, string token);
+        static void receiveMessage(int socket);
 };
 
 #endif //TOKENRING_SENDINGUTILS_H
