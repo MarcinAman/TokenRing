@@ -1,3 +1,7 @@
+#include <utility>
+
+#include <utility>
+
 //
 // Created by Marcin Aman on 2019-03-09.
 //
@@ -31,4 +35,24 @@ Input InputParser::parseArguments(int argc, char *argv[]) {
     }
 
     return parsedCommandLine;
+}
+
+Input::Input(std::string id, int listeningPort, std::string neighbourIpAddess, bool doesHaveToken, Protocol protocol) {
+    this->id = std::move(id);
+    this->listeningPort = listeningPort;
+    this->doesHaveToken = doesHaveToken;
+    this->protocol = protocol;
+    this->neighbourIpAddess = std::move(neighbourIpAddess);
+}
+
+Input::Input() {
+    this -> id = "";
+    this->doesHaveToken = false;
+    this->listeningPort = 0;
+    this->neighbourIpAddess = "";
+}
+
+std::string Input::toString() {
+    return "Id: " + this->id + ", Token: " + (this->doesHaveToken ? "true":"false") + ", listeningPort: "
+    + std::to_string(this->listeningPort) + ", neighbourIpAddess: " + this->neighbourIpAddess + ", protocol: " + (this->protocol == TCP ? "TCP" : "UDP");
 }

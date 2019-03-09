@@ -19,15 +19,10 @@
  */
 
 int main(int argc, char *argv[]) {
-    std::cout << "Hello, World!" << std::endl;
     Input input = InputParser::parseArguments(argc, argv);
 
-    std::cout << input.protocol << std::endl;
-    std::cout << input.neighbourIpAddess << std::endl;
-    std::cout << input.listeningPort << std::endl;
-    std::cout << input.id << std::endl;
-    std::cout << input.doesHaveToken << std::endl;
-
+    std::cout << "Client initialized with parameters:" << std::endl;
+    std::cout << input.toString() << std::endl;
 
     return 0;
 }

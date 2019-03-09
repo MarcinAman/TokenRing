@@ -11,13 +11,19 @@ enum Protocol {
     TCP, UDP
 };
 
-typedef struct Input {
-    std::string id;
-    int listeningPort;
-    std::string neighbourIpAddess;
-    bool doesHaveToken;
-    Protocol protocol;
-} Input;
+class Input {
+    public:
+        std::string id;
+        int listeningPort;
+        std::string neighbourIpAddess;
+        bool doesHaveToken;
+        Protocol protocol;
+
+        Input(std::string id, int listeningPort, std::string neighbourIpAddess, bool doesHaveToken, Protocol protocol);
+        Input();
+
+        std::string toString();
+};
 
 using namespace std;
 
