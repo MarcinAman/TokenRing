@@ -8,6 +8,7 @@
 
 #include "Token.h"
 
+
 TokenType Token::type() {
     return this -> tokentType;
 }
@@ -18,15 +19,6 @@ void Token::setData(std::string data) {
 
 std::string Token::getData() {
     return this->data;
-}
-
-void Token::setAddesses(std::string sourceAddress, std::string destinationAddress) {
-    if(sourceAddress.empty() || destinationAddress.empty()){
-        throw "Provided address is empty!";
-    }
-
-    this->sourceAddress = sourceAddress;
-    this->destinationAddress = destinationAddress;
 }
 
 int Token::getTTL() {
@@ -58,7 +50,7 @@ void Token::setType(TokenType type) {
 void Token::fillFromString(std::string s) {
     std::string delimiter = "|";
 
-    std::vector<std::string> splitted = split(std::move(s), delimiter);
+    std::vector<std::string> splitted = StringUtils::split(std::move(s), delimiter);
 
     for(const std::string &token : splitted){
         if(token.rfind("data") == 0){ //starts with
@@ -73,25 +65,9 @@ void Token::fillFromString(std::string s) {
         } else if(token.rfind("type") == 0){
             this->setType(typeFromString(getValue(token)));
         } else {
-            std::cout << "token not found: " + token << std::endl;
+            throw std::runtime_error("Token not found: " + token);
         }
     }
-}
-
-std::vector<std::string> Token::split(std::string s, std::string delimiter){
-    std::vector<std::string> vec;
-
-    size_t pos = 0;
-    std::string token;
-    while ((pos = s.find(delimiter)) != std::string::npos) {
-        token = s.substr(0, pos);
-        vec.push_back(token);
-        s.erase(0, pos + delimiter.length());
-    }
-
-    vec.push_back(s);
-
-    return vec;
 }
 
 TokenType Token::typeFromString(std::string type) {
@@ -112,7 +88,7 @@ TokenType Token::typeFromString(std::string type) {
 }
 
 std::string Token::getValue(std::string s) {
-    std::vector<std::string> data = split(s, "=");
+    std::vector<std::string> data = StringUtils::split(std::move(s), "=");
 
     return data.at(1);
 }

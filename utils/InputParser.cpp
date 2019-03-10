@@ -7,6 +7,7 @@
 //
 
 #include "InputParser.h"
+#include "StringUtils.h"
 #include <vector>
 #include <iostream>
 
@@ -26,7 +27,11 @@ Input InputParser::parseArguments(int argc, char *argv[]) {
     parsedCommandLine.doesHaveToken = commandLine["-token"] == "T";
     parsedCommandLine.id = commandLine["-id"];
     parsedCommandLine.listeningPort = std::stoi(commandLine["-port"]);
-    parsedCommandLine.neighbourIpAddess = commandLine["-address"];
+
+    string address = commandLine["-address"];
+    std::vector<string> splitted = StringUtils::split(address, ":");
+    parsedCommandLine.neighbourIpAddess = splitted.at(0);
+    parsedCommandLine.neighbourPort = atoi(splitted.at(1).c_str());
 
     if(commandLine["-protocol"] == "TCP"){
         parsedCommandLine.protocol = TCP;
@@ -37,22 +42,16 @@ Input InputParser::parseArguments(int argc, char *argv[]) {
     return parsedCommandLine;
 }
 
-Input::Input(std::string id, int listeningPort, std::string neighbourIpAddess, bool doesHaveToken, Protocol protocol) {
-    this->id = std::move(id);
-    this->listeningPort = listeningPort;
-    this->doesHaveToken = doesHaveToken;
-    this->protocol = protocol;
-    this->neighbourIpAddess = std::move(neighbourIpAddess);
-}
 
 Input::Input() {
     this -> id = "";
     this->doesHaveToken = false;
     this->listeningPort = 0;
     this->neighbourIpAddess = "";
+    this->neighbourPort = 0;
 }
 
 std::string Input::toString() {
     return "Id: " + this->id + ", Token: " + (this->doesHaveToken ? "true":"false") + ", listeningPort: "
-    + std::to_string(this->listeningPort) + ", neighbourIpAddess: " + this->neighbourIpAddess + ", protocol: " + (this->protocol == TCP ? "TCP" : "UDP");
+    + std::to_string(this->listeningPort) + ", neighbourIpAddess: " + this->neighbourIpAddess+":"+to_string(this -> neighbourPort) + ", protocol: " + (this->protocol == TCP ? "TCP" : "UDP");
 }

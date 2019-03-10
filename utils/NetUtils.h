@@ -14,6 +14,8 @@
 #include <iostream>
 #include <unistd.h>
 #include <cstddef>
+#include <system_error>
+#include <iostream>
 
 #include "InputParser.h"
 #include "../Token.h"
@@ -24,7 +26,7 @@ class NetUtils {
         static int socketForSending(Protocol protocol, string address, uint16_t port);
         
         static void sendMessage(int socket, Token token);
-        static void receiveMessage(int socket);
+        static void receiveMessage(int receivingSocket, Input intut);
 };
 
 #endif //TOKENRING_SENDINGUTILS_H

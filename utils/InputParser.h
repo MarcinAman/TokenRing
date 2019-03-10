@@ -16,10 +16,10 @@ class Input {
         std::string id;
         int listeningPort;
         std::string neighbourIpAddess;
+        int neighbourPort;
         bool doesHaveToken;
         Protocol protocol;
 
-        Input(std::string id, int listeningPort, std::string neighbourIpAddess, bool doesHaveToken, Protocol protocol);
         Input();
 
         std::string toString();

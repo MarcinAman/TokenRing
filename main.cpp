@@ -1,3 +1,5 @@
+#include <utility>
+
 #include <iostream>
 #include <string>
 #include "utils/InputParser.h"
@@ -28,7 +30,20 @@
  * bit pola sterowania dostępem, co informuje nadawcę, że ramka została odebrana. Potem ramka kontynuuje swoją podróż przez pierścień,
  * dopóki nie powróci do urządzenia, które ją wysłało. Gdy urządzenie ją odbierze, uznaje się, że transmisja zakończyła się sukcesem;
  * zawartość ramki jest kasowana, a sama ramka jest z powrotem przekształcana w token.
+ *
+ * najpierw jest stan listen. Potem jak dostanie cos na ten socket to tworzy nastepny do wysylania do tego kogos
  */
+
+void sendInitMessage(int sendingSocket, Input input){
+    Token token;
+    token.setData("penis string is the best");
+    token.setDestinationAddress(input.neighbourIpAddess);
+    token.setSourceAddress(std::to_string(input.listeningPort));
+    token.setType(INIT);
+    token.setTTL(10);
+
+    NetUtils::sendMessage(sendingSocket, token);
+}
 
 int main(int argc, char *argv[]) {
     Input input = InputParser::parseArguments(argc, argv);
@@ -36,21 +51,21 @@ int main(int argc, char *argv[]) {
     std::cout << "Initialized with parameters:" << std::endl;
     std::cout << input.toString() << std::endl;
 
-    if(input.doesHaveToken){
-        int socket = NetUtils::socketForReceiving(input.protocol, static_cast<uint16_t>(input.listeningPort));
-        printf("socket: %d\n", socket);
+    if(input.listeningPort == input.neighbourPort){
+        //this is first, we dont open sending socket because no one is listening
+        int receivingSocket = NetUtils::socketForReceiving(input.protocol, static_cast<uint16_t>(input.listeningPort));
+        printf("socket recv: %d\n", receivingSocket);
 
-        NetUtils::receiveMessage(socket);
+        NetUtils::receiveMessage(receivingSocket, input);
     } else {
-        int socket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess, static_cast<uint16_t>(input.listeningPort));
-        printf("socket: %d\n", socket);
+        //other nodes
+        int sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess, static_cast<uint16_t>(input.neighbourPort));
+        printf("sending socket: %d\n", sendingSocket);
 
-        Token token;
-        token.setData("penis string is the best");
-        token.setAddesses(input.neighbourIpAddess, input.neighbourIpAddess);
-        token.setType(INIT);
-        token.setTTL(10);
-        NetUtils::sendMessage(socket, token);
+        sendInitMessage(sendingSocket, input);
+
+        int receivingSocket = NetUtils::socketForReceiving(input.protocol, static_cast<uint16_t>(input.listeningPort));
+        NetUtils::receiveMessage(receivingSocket, input);
     }
 
     return 0;

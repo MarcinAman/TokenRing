@@ -18,23 +18,20 @@ int NetUtils::socketForReceiving(Protocol protocol, uint16_t port) {
     int bindResult = bind(socketFD, (struct sockaddr *)&address, sizeof(address));
 
     if(bindResult < 0){
-        printf("Error code: %s\n", strerror(errno));
-        throw "Failed to bind socket to port: \n" + std::to_string(port);
+        throw std::runtime_error("Failed to connect to receiving socket: " + std::to_string(port) + "\n" + string(strerror(errno)));
     }
 
     int listenResult = listen(socketFD, 64); // w sumie to cokolwiek wieksze od 1 bo i tak nie powinnismy miec w kolejce wiecej niz 1
 
     if(listenResult < 0){
-        printf("Error code: %s\n", strerror(errno));
-        throw "Failed to listen";
+        throw std::runtime_error("Failed to listen: " + string(strerror(errno)));
     }
 
     int addrLen = sizeof(address);
     socketFD = accept(socketFD, (struct sockaddr *)&address, (socklen_t*)&addrLen);
 
     if(socketFD < 0) {
-        printf("Error code: %s\n", strerror(errno));
-        throw "Failed to accept";
+        throw std::runtime_error("Failed to accept: " + string(strerror(errno)));
     }
 
     return socketFD;
@@ -42,6 +39,10 @@ int NetUtils::socketForReceiving(Protocol protocol, uint16_t port) {
 
 int NetUtils::socketForSending(Protocol protocol, string address, uint16_t port) {
     int socketFD = createSocket(protocol);
+
+    if(socketFD < 0) {
+        throw std::runtime_error("Failed to create sending socket: " + string(strerror(errno)));
+    }
 
     struct sockaddr_in server{};
     server.sin_family = AF_INET;
@@ -51,8 +52,7 @@ int NetUtils::socketForSending(Protocol protocol, string address, uint16_t port)
     int connectResult = connect(socketFD, (struct sockaddr *)&server, sizeof(server));
 
     if(connectResult < 0) {
-        printf("Error code: %s\n", strerror(errno));
-        throw "Failed to connect";
+        throw std::runtime_error("Failed to connect to sending socket: " + string(strerror(errno)));
     }
 
     return socketFD;
@@ -63,24 +63,37 @@ void NetUtils::sendMessage(int socket, Token token) {
     ssize_t sendResult = write(socket, toSend.c_str(), toSend.size());
 
     if(sendResult != toSend.size()) {
-        printf("Error code: %s\n", strerror(errno));
-        throw "Failed to send message";
+        throw std::runtime_error("Failed to send message: " + string(strerror(errno)));;
     }
 }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
-void NetUtils::receiveMessage(int socket) {
+void NetUtils::receiveMessage(int receivingSocket, Input input) {
+    int sendingSocket = -1;
     char dataReceived[1024];
 
     while(true){
-        ssize_t bytesRead = read(socket, &dataReceived, 1024);
+        ssize_t bytesRead = read(receivingSocket, &dataReceived, 1024);
 
         if(bytesRead > 0){
             std::string response(dataReceived);
             Token token;
             token.fillFromString(response);
             std::cout << token.toString() << std::endl;
+
+            if(token.type() == INIT && sendingSocket == -1){
+                sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess, static_cast<uint16_t>(input.listeningPort));
+                token.setType(ACK);
+                NetUtils::sendMessage(sendingSocket, token);
+            } else if(token.type() == INIT) {
+
+            } else if(token.type() == DISCONNECT){
+
+            } else {
+                //message type
+            }
+
         }
     }
 
@@ -97,8 +110,7 @@ int createSocket(Protocol protocol){
     }
 
     if(socketFD <= 0){
-        printf("Error code: %s\n", strerror(errno));
-        throw "Failed to create socket";
+        throw std::runtime_error("Failed to create socket: " + string(strerror(errno)));
     }
 
     return socketFD;
