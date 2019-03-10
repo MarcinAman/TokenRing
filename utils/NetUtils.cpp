@@ -83,7 +83,10 @@ void NetUtils::receiveMessage(int receivingSocket, Input input) {
             std::cout << token.toString() << std::endl;
 
             if(token.type() == INIT && sendingSocket == -1){
-                sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess, static_cast<uint16_t>(input.listeningPort));
+                std::string destination = token.getDestinationAddress();
+
+                std::vector<std::string> parsed = StringUtils::split(destination,":");
+                sendingSocket = NetUtils::socketForSending(input.protocol, parsed.at(0), static_cast<uint16_t>(atoi(token.getSourceAddress().c_str())));
                 token.setType(ACK);
                 NetUtils::sendMessage(sendingSocket, token);
             } else if(token.type() == INIT) {

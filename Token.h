@@ -10,6 +10,7 @@
 #include <vector>
 #include <stdlib.h>
 #include "utils/StringUtils.h"
+#include <algorithm>
 
 enum TokenType {
     INIT, MSG, ACK, DISCONNECT
@@ -34,6 +35,8 @@ class Token {
         void fillFromString(std::string json);
         void setSourceAddress(std::string s);
         void setDestinationAddress(std::string s);
+        std::string getSourceAddress();
+        std::string getDestinationAddress();
 
     private:
         std::string typeToString(TokenType token);

@@ -71,17 +71,17 @@ void Token::fillFromString(std::string s) {
 }
 
 TokenType Token::typeFromString(std::string type) {
-    if(type == "INIT"){
+    if(type.rfind("INIT") == 0){
         return INIT;
     }
-    if(type == "MSG"){
+    if(type.rfind("MSG")){
         return MSG;
     }
-    if(type == "ACK"){
+    if(type.rfind("ACK")){
         return ACK;
     }
-    if(type == "DISCONNECT"){
-        return DISCONNECT;
+    if(type.rfind("ACK")){
+        return ACK;
     }
 
     return MSG;
@@ -99,4 +99,12 @@ void Token::setSourceAddress(std::string s) {
 
 void Token::setDestinationAddress(std::string s) {
     this->destinationAddress = std::move(s);
+}
+
+std::string Token::getSourceAddress() {
+    return this->sourceAddress;
+}
+
+std::string Token::getDestinationAddress() {
+    return this->destinationAddress;
 }

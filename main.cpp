@@ -37,7 +37,7 @@
 void sendInitMessage(int sendingSocket, Input input){
     Token token;
     token.setData("penis string is the best");
-    token.setDestinationAddress(input.neighbourIpAddess);
+    token.setDestinationAddress(input.neighbourIpAddess+":"+to_string(input.neighbourPort));
     token.setSourceAddress(std::to_string(input.listeningPort));
     token.setType(INIT);
     token.setTTL(10);
