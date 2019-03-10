@@ -60,11 +60,11 @@ int NetUtils::socketForSending(Protocol protocol, string address, uint16_t port)
     return socketFD;
 }
 
-//template<typename D, typename A>
-void NetUtils::sendMessage(int socket, string token) {
-    ssize_t sendResult = write(socket, token.c_str(), token.size());
+template<typename D, typename A>
+void NetUtils::sendMessage(int socket, Token<D,A> token) {
+    ssize_t sendResult = write(socket, token.c_str(), sizeof(token));
 
-    if(sendResult != token.size()) {
+    if(sendResult != sizeof(token)) {
         printf("Error code: %s\n", strerror(errno));
         throw "Failed to send message";
     }

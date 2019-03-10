@@ -5,8 +5,8 @@
 #include "Token.h"
 
 template<class D, class A>
-bool Token<D, A>::isTaken() {
-    return this->taken;
+TokenType Token<D, A>::type() {
+    return this -> tokentType;
 }
 
 template<class D, class A>
@@ -34,16 +34,6 @@ Token<D,A> Token<D, A>::setAddesses(A sourceAddress, A destinationAddress) {
     this->destinationAddress = destinationAddress;
 
     return this;
-}
-
-template<class D, class A>
-Token<D,A> Token<D, A>::markAsFree() {
-    if(this->isTaken()){
-        this->isTaken() = false;
-        return Token();
-    } else {
-        throw "Token was free";
-    }
 }
 
 template<class D, class A>

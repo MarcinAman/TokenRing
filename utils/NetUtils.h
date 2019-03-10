@@ -19,8 +19,9 @@ class NetUtils {
     public:
         static int socketForReceiving(Protocol protocol, uint16_t port);
         static int socketForSending(Protocol protocol, string address, uint16_t port);
-//        template <class D, class A>
-        static void sendMessage(int socket, string token);
+        
+        template <class D, class A>
+        static void sendMessage(int socket, Token<D,A> token);
         static void receiveMessage(int socket);
 };
 

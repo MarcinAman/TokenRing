@@ -4,8 +4,19 @@
 #include "utils/NetUtils.h"
 
 /*
- * 1. Wlacza sie 1 klient, dostaje null jako adres nastepnego
- * 2. Wlacza sie 2 klient i dostaje port poprzedniego
+ * 1. Wlacza sie 1 klient, dostaje swoj adress jako wejsciowy.
+ * 2. Wlacza sie 2 klient i dostaje port poprzedniego nastepnie wysyla do niego token typu init.
+ * 3. Kazdy klient posiada stos z kolejnymi komunikatami jakie ma nadac. Jesli klient otrzyma token init to 
+ *  musi wrzucic go na stos i jak dostanie token to zaadresowac do sasiada. 
+ * 4. Jesli token wroci (co sprawdzamy przez fakt, ze mamy juz ten adres w kolejce) i dostaniemy token to nadajemy
+ *  kolejna wiadomosc ze stosu
+ * 5. Po otrzymaniu jakiegokolwiek tokenu zmieniamy jego pole TTL na TTL-- i sprawdzamy czy jest do nas adresowany. 
+ *  - Jesli jest to robimy kopie, ustawiamy defaultowy TTL, i zamieniamy adresy oraz typ na ACK, wysylamy
+ *  - Jesli nie jest to wysylamy
+ * Algorytm dla disconnect dziala tak samo jak dla init
+ * 
+ * Typy tokenow:
+ * INIT, MSG, ACK, DISCONNECT
  *
  * Potrzebujemy sie zabezpieczyc przed sytuacja gdzie stacja koncowa/poczatkowa umarla. Moze jakis TTL?
  *

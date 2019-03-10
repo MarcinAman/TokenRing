@@ -5,10 +5,14 @@
 #ifndef TOKENRING_TOKEN_H
 #define TOKENRING_TOKEN_H
 
+enum TokenType {
+    INIT, MSG, ACK, DISCONNECT
+};
+
 template <class D, class A>
 class Token {
     private:
-        bool taken;
+        TokenType tokentType;
         D data;
         A sourceAddress;
         A destinationAddress;
@@ -16,11 +20,10 @@ class Token {
 
     public:
     explicit Token(int TTL);
-        bool isTaken();
+        TokenType type();
         D setData(D data);
         D getData();
         Token setAddesses(A sourceAddress, A destinationAddress);
-        Token markAsFree();
         int getTTL();
 };
 
