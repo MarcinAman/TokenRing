@@ -11,6 +11,9 @@
 #include <errno.h>
 #include <cstring>
 #include <arpa/inet.h>
+#include <iostream>
+#include <unistd.h>
+#include <cstddef>
 
 #include "InputParser.h"
 #include "../Token.h"
@@ -20,8 +23,7 @@ class NetUtils {
         static int socketForReceiving(Protocol protocol, uint16_t port);
         static int socketForSending(Protocol protocol, string address, uint16_t port);
         
-        template <class D, class A>
-        static void sendMessage(int socket, Token<D,A> token);
+        static void sendMessage(int socket, Token token);
         static void receiveMessage(int socket);
 };
 

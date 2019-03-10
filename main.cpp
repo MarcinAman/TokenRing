@@ -44,7 +44,13 @@ int main(int argc, char *argv[]) {
     } else {
         int socket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess, static_cast<uint16_t>(input.listeningPort));
         printf("socket: %d\n", socket);
-        NetUtils::sendMessage(socket, "The most amazing message ever");
+
+        Token token;
+        token.setData("penis string is the best");
+        token.setAddesses(input.neighbourIpAddess, input.neighbourIpAddess);
+        token.setType(INIT);
+        token.setTTL(10);
+        NetUtils::sendMessage(socket, token);
     }
 
     return 0;

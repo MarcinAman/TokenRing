@@ -4,27 +4,35 @@
 
 #ifndef TOKENRING_TOKEN_H
 #define TOKENRING_TOKEN_H
+#include <string>
+#include <iostream>
+#include <cstring>
 
 enum TokenType {
     INIT, MSG, ACK, DISCONNECT
 };
 
-template <class D, class A>
 class Token {
     private:
         TokenType tokentType;
-        D data;
-        A sourceAddress;
-        A destinationAddress;
+        std::string data;
+        std::string sourceAddress;
+        std::string destinationAddress;
         int TTL;
 
     public:
-    explicit Token(int TTL);
         TokenType type();
-        D setData(D data);
-        D getData();
-        Token setAddesses(A sourceAddress, A destinationAddress);
+        void setData(std::string data);
+        std::string getData();
+        void setTTL(int ttl);
+        void setType(TokenType type);
+        void setAddesses(std::string sourceAddress, std::string destinationAddress);
         int getTTL();
+        std::string toString();
+        void fillFromString(std::string json);
+
+    private:
+        std::string typeToString(TokenType token);
 };
 
 #endif //TOKENRING_TOKEN_H

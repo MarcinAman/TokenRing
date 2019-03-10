@@ -2,10 +2,8 @@
 // Created by woolfy on 3/9/19.
 //
 
-#include <iostream>
-#include <unistd.h>
 #include "NetUtils.h"
-#include "../Token.h"
+
 
 int createSocket(Protocol);
 
@@ -60,11 +58,11 @@ int NetUtils::socketForSending(Protocol protocol, string address, uint16_t port)
     return socketFD;
 }
 
-template<typename D, typename A>
-void NetUtils::sendMessage(int socket, Token<D,A> token) {
-    ssize_t sendResult = write(socket, token.c_str(), sizeof(token));
+void NetUtils::sendMessage(int socket, Token token) {
+    std::string toSend = token.toString();
+    ssize_t sendResult = write(socket, toSend.c_str(), toSend.size());
 
-    if(sendResult != sizeof(token)) {
+    if(sendResult != toSend.size()) {
         printf("Error code: %s\n", strerror(errno));
         throw "Failed to send message";
     }
