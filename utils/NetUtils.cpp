@@ -77,7 +77,10 @@ void NetUtils::receiveMessage(int socket) {
         ssize_t bytesRead = read(socket, &dataReceived, 1024);
 
         if(bytesRead > 0){
-            std::cout << dataReceived << std::endl;
+            std::string response(dataReceived);
+            Token token;
+            token.fillFromString(response);
+            std::cout << token.toString() << std::endl;
         }
     }
 

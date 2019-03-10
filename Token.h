@@ -7,6 +7,8 @@
 #include <string>
 #include <iostream>
 #include <cstring>
+#include <vector>
+#include <stdlib.h>
 
 enum TokenType {
     INIT, MSG, ACK, DISCONNECT
@@ -33,6 +35,11 @@ class Token {
 
     private:
         std::string typeToString(TokenType token);
+        std::vector<std::string> split(std::string, std::string);
+        TokenType typeFromString(std::string type);
+        std::string getValue(std::string s);
+        void setSourceAddress(std::string s);
+        void setDestinationAddress(std::string s);
 };
 
 #endif //TOKENRING_TOKEN_H
