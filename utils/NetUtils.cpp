@@ -2,10 +2,16 @@
 // Created by woolfy on 3/9/19.
 //
 
+#include <csignal>
 #include "NetUtils.h"
 
 
 int createSocket(Protocol);
+
+void closeAndShutdownSocket(int socket){
+    shutdown(socket, SHUT_RDWR);
+    close(socket);
+}
 
 int NetUtils::socketForReceiving(Protocol protocol, uint16_t port) {
     int socketFD = createSocket(protocol);
@@ -66,42 +72,6 @@ void NetUtils::sendMessage(int socket, Token token) {
         throw std::runtime_error("Failed to send message: " + string(strerror(errno)));;
     }
 }
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
-void NetUtils::receiveMessage(int receivingSocket, Input input) {
-    int sendingSocket = -1;
-    char dataReceived[1024];
-
-    while(true){
-        ssize_t bytesRead = read(receivingSocket, &dataReceived, 1024);
-
-        if(bytesRead > 0){
-            std::string response(dataReceived);
-            Token token;
-            token.fillFromString(response);
-            std::cout << token.toString() << std::endl;
-
-            if(token.type() == INIT && sendingSocket == -1){
-                std::string destination = token.getDestinationAddress();
-
-                std::vector<std::string> parsed = StringUtils::split(destination,":");
-                sendingSocket = NetUtils::socketForSending(input.protocol, parsed.at(0), static_cast<uint16_t>(atoi(token.getSourceAddress().c_str())));
-                token.setType(ACK);
-                NetUtils::sendMessage(sendingSocket, token);
-            } else if(token.type() == INIT) {
-
-            } else if(token.type() == DISCONNECT){
-
-            } else {
-                //message type
-            }
-
-        }
-    }
-
-}
-#pragma clang diagnostic pop
 
 int createSocket(Protocol protocol){
     int socketFD = 0;

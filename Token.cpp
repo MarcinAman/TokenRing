@@ -74,13 +74,13 @@ TokenType Token::typeFromString(std::string type) {
     if(type.rfind("INIT") == 0){
         return INIT;
     }
-    if(type.rfind("MSG")){
+    if(type.rfind("MSG") == 0){
         return MSG;
     }
-    if(type.rfind("ACK")){
+    if(type.rfind("ACK") == 0){
         return ACK;
     }
-    if(type.rfind("ACK")){
+    if(type.rfind("ACK") == 0){
         return ACK;
     }
 
