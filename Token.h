@@ -13,7 +13,7 @@
 #include <algorithm>
 
 enum TokenType {
-    INIT, MSG, ACK, DISCONNECT, EMPTY
+    INIT, MSG, ACK, CHANGE, EMPTY
 };
 
 class Token {

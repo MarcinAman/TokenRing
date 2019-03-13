@@ -12,41 +12,17 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
-/*
- * 1. Wlacza sie 1 klient, dostaje swoj adress jako wejsciowy.
- * 2. Wlacza sie 2 klient i dostaje port poprzedniego nastepnie wysyla do niego token typu init.
- * 3. Kazdy klient posiada stos z kolejnymi komunikatami jakie ma nadac. Jesli klient otrzyma token init to 
- *  musi wrzucic go na stos i jak dostanie token to zaadresowac do sasiada. 
- * 4. Jesli token wroci (co sprawdzamy przez fakt, ze mamy juz ten adres w kolejce) i dostaniemy token to nadajemy
- *  kolejna wiadomosc ze stosu
- * 5. Po otrzymaniu jakiegokolwiek tokenu zmieniamy jego pole TTL na TTL-- i sprawdzamy czy jest do nas adresowany. 
- *  - Jesli jest to robimy kopie, ustawiamy defaultowy TTL, i zamieniamy adresy oraz typ na ACK, wysylamy
- *  - Jesli nie jest to wysylamy
- * Algorytm dla disconnect dziala tak samo jak dla init
- * 
- * Typy tokenow:
- * INIT, MSG, ACK, DISCONNECT
- *
- * Potrzebujemy sie zabezpieczyc przed sytuacja gdzie stacja koncowa/poczatkowa umarla. Moze jakis TTL?
- *
- *
- * Token służy więc do utworzenia ramki danych. Nadająca stacja zmienia sekwencję SOF, dodaje potrzebne dane, adresuje je
- * i umieszcza z powrotem w sieci. Jeśli stacja nie chce nadawać, może po prostu z powrotem umieścić token w sieci
- * – wtedy otrzyma go kolejna stacja. Gdy ramka dotrze do miejsca przeznaczenia, urządzenie odbierające nie wyciąga ramki z sieci,
- * lecz po prostu kopiuje jej zawartość do bufora w celu dalszego wewnętrznego przetwarzania. W oryginalnej ramce zmieniany jest
- * bit pola sterowania dostępem, co informuje nadawcę, że ramka została odebrana. Potem ramka kontynuuje swoją podróż przez pierścień,
- * dopóki nie powróci do urządzenia, które ją wysłało. Gdy urządzenie ją odbierze, uznaje się, że transmisja zakończyła się sukcesem;
- * zawartość ramki jest kasowana, a sama ramka jest z powrotem przekształcana w token.
- *
- * najpierw jest stan listen. Potem jak dostanie cos na ten socket to tworzy nastepny do wysylania do tego kogos
- */
 
 int sendingSocket = -1;
 int receivingSocket = -1;
+int multicastSocket = -1;
+
+string multicastIP = "224.0.0.1";
+int multicast_port = 9999;
 
 void sendInitMessage(Input input){
     Token token;
-    token.setData("penis string is the best");
+    token.setData("INIT!");
     token.setDestinationAddress(input.neighbourIpAddess+":"+to_string(input.neighbourPort));
     token.setSourceAddress(input.neighbourIpAddess+":"+std::to_string(input.listeningPort));
     token.setType(INIT);
@@ -81,6 +57,25 @@ void atExit(){
     closeSockets(0);
 }
 
+void initMulti(){
+    multicastSocket = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (multicastSocket == -1) {
+        throw std::runtime_error("Failed to create socket for multicastIP: " + string(strerror(errno)));
+    }
+}
+
+void sendMulti(const string &toSend){
+    struct sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = inet_addr(multicastIP.c_str());
+    addr.sin_port = htons(static_cast<uint16_t>(multicast_port));
+
+    if (sendto(multicastSocket,toSend.c_str(), toSend.size(), 0, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+        throw std::runtime_error("Failed to send sthing to multicastIP: " + string(strerror(errno)));
+    }
+}
+
 
 int main(int argc, char *argv[]) {
     Input input = InputParser::parseArguments(argc, argv);
@@ -100,6 +95,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<string> knownHosts;
 
+    initMulti();
 
     if(input.listeningPort != input.neighbourPort){
 
@@ -135,35 +131,58 @@ int main(int argc, char *argv[]) {
             token.fillFromString(response);
             std::cout << token.toString() << std::endl;
 
-            if(token.type() == INIT && (sendingSocket == -1 || token.getDestinationAddress() == "127.0.0.1:"+to_string(input.listeningPort))){
+            if(token.type() == INIT &&
+            (sendingSocket == -1 ||
+            token.getDestinationAddress() == input.neighbourIpAddess+":"+to_string(input.neighbourPort))){
                 std::string source = token.getSourceAddress();
                 //add to known hosts
-                knownHosts.push_back(source);
 
                 std::vector<std::string> parsed = StringUtils::split(source,":");
 
-                //and change the way i send messages to proxy them through the new node:
-                input.neighbourPort = atoi(parsed.at(1).c_str());
-                input.neighbourIpAddess = parsed.at(0);
+                if(atoi(parsed.at(1).c_str()) != input.neighbourPort){
+                    knownHosts.push_back(source);
+                    input.neighbourPort = atoi(parsed.at(1).c_str());
+                    input.neighbourIpAddess = parsed.at(0);
+                    cout << "[INIT] changed sending ports to: " +  source << endl;
+                } else {
+                    cout << "init didnt change porst" << endl;
+                }
 
-                token.setType(ACK);
-            } else if(token.type() == INIT ){
+                sendMulti(input.id);
+            } else if(token.type() == EMPTY || token.getTTL() <= 0){
+                    // empty, rand for sending
+                    // or ttl expired
+
+                    if(rand()%2 == 0){
+                        cout << "Client "+ input.id + " decided to send message" << endl;
+
+                        token.setData(to_string(rand()%10000));
+                        token.setType(MSG);
+                        token.setSourceAddress("127.0.0.1:"+to_string(input.listeningPort));
+
+                        unsigned long index = rand() % knownHosts.size();
+                        token.setDestinationAddress(knownHosts.at(index));
+
+                        cout << "sending message to: " + knownHosts.at(index) << endl;
+                        sendMulti(input.id);
+
+                    } else{
+                        cout << "Client "+ input.id + " decided to pass token" << endl;
+                        token.setData("");
+                        token.setType(EMPTY);
+                    }
+
+                    token.setTTL(10);
+                } else if(token.type() == INIT
+                && token.getDestinationAddress() == "127.0.0.1:"+to_string(input.listeningPort)){
                 //thats mine so i pass it
-                knownHosts.push_back(token.getSourceAddress());
-            } else if(token.type() == DISCONNECT){
-                // check if the node that disconnected is our's destination.
-                // If so, update sending socket
-                string source = token.getSourceAddress();
-                auto f = [&source](string v){
-                    return v == source;
-                };
-
-                knownHosts.erase(
-                        remove_if(knownHosts.begin(), knownHosts.end(), f), knownHosts.end()
-                        );
-
-                //after removing send update to others by ignoring this message
-
+                if(token.getDestinationAddress() == token.getSourceAddress()){
+                    token.setType(EMPTY);
+                    token.setTTL(10);
+                } else {
+                    knownHosts.push_back(token.getSourceAddress());
+                    token.setSourceAddress("127.0.0.1:"+to_string(input.listeningPort));
+                }
             } else if(token.type() == MSG){
                 //Is it addressed to me?
                 if(token.getDestinationAddress() == "127.0.0.1:"+to_string(input.listeningPort)) {
@@ -171,6 +190,7 @@ int main(int argc, char *argv[]) {
                     token.setSourceAddress(token.getDestinationAddress());
                     token.setDestinationAddress(token.getSourceAddress());
                     token.setTTL(10);
+                    sendMulti(input.id);
                 }
                 // if no just ignore and pass with lower ttl
             } else if(token.type() == ACK){
@@ -179,33 +199,6 @@ int main(int argc, char *argv[]) {
                 token.setTTL(10);
                 token.setType(EMPTY);
 
-            } else if(token.type() == EMPTY || token.getTTL() <= 0){
-                // empty, rand for sending
-                // or ttl expired
-
-                if(rand()%2 == 0){
-                    cout << "Client "+ input.id + " decided to send message" << endl;
-
-                    time_t ti;
-                    time (&ti);
-                    string currentTime = ctime(&ti);
-
-                    token.setData(currentTime);
-                    token.setType(MSG);
-                    token.setSourceAddress("127.0.0.1:"+to_string(input.listeningPort));
-
-                    unsigned long index = rand() % knownHosts.size();
-                    token.setDestinationAddress(knownHosts.at(index));
-
-                    cout << "sending message to: " + knownHosts.at(index) << endl;
-
-                } else{
-                    cout << "Client "+ input.id + " decided to pass token" << endl;
-                    token.setData("");
-                    token.setType(EMPTY);
-                }
-
-                token.setTTL(10);
             }
 
             int ttl = token.getTTL()-1;

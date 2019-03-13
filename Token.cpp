@@ -35,7 +35,7 @@ std::string Token::typeToString(TokenType token) {
         case INIT: return "INIT";
         case MSG: return "MSG";
         case ACK: return "ACK";
-        case DISCONNECT: return "DISCONNECT";
+        case CHANGE: return "CHANGE";
         case EMPTY: return "EMPTY";
     }
 }
@@ -86,6 +86,9 @@ TokenType Token::typeFromString(std::string type) {
     }
     if(type.rfind("EMPTY") == 0){
         return EMPTY;
+    }
+    if(type.rfind("CHANGE") == 0){
+        return CHANGE;
     }
 
     return MSG;
