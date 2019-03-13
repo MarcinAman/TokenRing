@@ -116,6 +116,10 @@ int main(int argc, char *argv[]) {
     int tcpInSocket = -1;
 
     while(true){
+        for (char &i : dataReceived) {
+            i = 0;
+        }
+
         tcpInSocket = accept(receivingSocket, NULL, NULL);
 
         if(tcpInSocket < 0) {
@@ -143,18 +147,25 @@ int main(int argc, char *argv[]) {
             if(token.type() == INIT){
                 // there is a client that would like to send to my neighbour:
                 if(token.getDestinationAddress() == input.neighbourIpAddess+":"+to_string(input.neighbourPort)
-                && token.getDestinationAddress() != getCurrentAddress(input)){
+                && token.getDestinationAddress() != getCurrentAddress(input)
+                && token.getData() != getCurrentAddress(input)){
                     //update sending socket:
 
                     std::string source = token.getData();
 
                     std::vector<std::string> parsed = StringUtils::split(source,":");
 
-                    knownHosts.push_back(source);
-                    input.neighbourPort = atoi(parsed.at(1).c_str());
-                    input.neighbourIpAddess = parsed.at(0);
+                    if(parsed.size() == 2){
+                        knownHosts.push_back(source);
+                        input.neighbourPort = atoi(parsed.at(1).c_str());
+                        input.neighbourIpAddess = parsed.at(0);
 
-                    cout << "[INIT1] changed sending ports to: " +  source << endl;
+                        cout << "[INIT1] changed sending ports to: " +  source << endl;
+                    } else {
+                        token.setTTL(10);
+                        token.setType(EMPTY);
+                    }
+
                 } else if(token.getDestinationAddress() == getCurrentAddress(input)){
 
                     if(knownHosts.empty()){
