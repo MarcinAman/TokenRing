@@ -13,7 +13,7 @@
 class StringUtils {
 public:
     static std::vector<std::string> split(std::string s, const std::string &delimiter);
-    static std::string trim(std::string s);
+    static std::string trimEnter(std::string s);
 };
 
 

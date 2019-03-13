@@ -7,6 +7,7 @@
 #include "utils/NetUtils.h"
 #include <ctime>
 #include <sys/epoll.h>
+#include <algorithm>
 
 
 #pragma clang diagnostic push
@@ -52,6 +53,8 @@ void sendInitMessage(int sendingSocket, Input input){
     token.setTTL(10);
 
     NetUtils::sendMessage(sendingSocket, token);
+
+    cout << "Init message sent" << endl;
 }
 
 void closeSockets(int s) {
@@ -90,10 +93,15 @@ int main(int argc, char *argv[]) {
         throw std::runtime_error("Failed to register atexit: " + string(strerror(errno)));
     }
 
+    std::vector<string> knownHosts;
+
+
     if(input.listeningPort != input.neighbourPort){
         sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess,
                                                    static_cast<uint16_t>(input.neighbourPort));
         std::cout << "socket send: " + to_string(sendingSocket) << std::endl;
+
+        knownHosts.push_back(input.neighbourIpAddess + ":" + to_string(input.neighbourPort));
 
         sendInitMessage(sendingSocket, input);
     }
@@ -119,22 +127,32 @@ int main(int argc, char *argv[]) {
 
             if(token.type() == INIT && sendingSocket == -1){
                 std::string source = token.getSourceAddress();
+                knownHosts.push_back(source);
 
                 std::vector<std::string> parsed = StringUtils::split(source,":");
 
                 sendingSocket = NetUtils::socketForSending(input.protocol, parsed.at(0),
                                                            static_cast<uint16_t>(atoi(parsed.at(1).c_str())));
                 token.setType(ACK);
-
-                sleep(1);
-
-                NetUtils::sendMessage(sendingSocket, token);
             } else if(token.type() == INIT){
                 // just send ack, nothing to do
                 // only add another host to stack
+                knownHosts.push_back(token.getSourceAddress());
+
             } else if(token.type() == DISCONNECT){
                 // check if the node that disconnected is our's destination.
                 // If so, update sending socket
+                string source = token.getSourceAddress();
+                auto f = [&source](string v){
+                    return v == source;
+                };
+
+                knownHosts.erase(
+                        remove_if(knownHosts.begin(), knownHosts.end(), f), knownHosts.end()
+                        );
+
+                //after removing send update to others by ignoring this message
+
             } else if(token.type() == MSG){
                 //Is it addressed to me?
                 if(token.getDestinationAddress() == "127.0.0.1:"+to_string(input.listeningPort)) {
@@ -143,11 +161,40 @@ int main(int argc, char *argv[]) {
                     token.setDestinationAddress(token.getSourceAddress());
                     token.setTTL(10);
                 }
+                // if no just ignore and pass with lower ttl
             } else if(token.type() == ACK){
                 // So message got passed.
                 // Send an empty one so some1 can send theirs
-            } else {
-                //empty, rand for sending
+                token.setTTL(10);
+                token.setType(EMPTY);
+
+            } else if(token.type() == EMPTY || token.getTTL() <= 0){
+                // empty, rand for sending
+                // or ttl expired
+
+                if(rand()%2 == 0){
+                    cout << "Client "+ input.id + " decided to send message" << endl;
+
+                    time_t ti;
+                    time (&ti);
+                    string currentTime = ctime(&ti);
+
+                    token.setData(currentTime);
+                    token.setType(MSG);
+                    token.setSourceAddress("127.0.0.1:"+to_string(input.listeningPort));
+
+                    unsigned long index = rand() % knownHosts.size();
+                    token.setDestinationAddress(knownHosts.at(index));
+
+                    cout << "sending message to: " + knownHosts.at(index) << endl;
+
+                } else{
+                    cout << "Client "+ input.id + " decided to pass token" << endl;
+                    token.setData("");
+                    token.setType(EMPTY);
+                }
+
+                token.setTTL(10);
             }
 
             int ttl = token.getTTL()-1;
@@ -155,12 +202,7 @@ int main(int argc, char *argv[]) {
 
             sleep(1);
 
-            if(ttl > 0){
-                NetUtils::sendMessage(sendingSocket, token);
-            } else {
-                //woops timeout and send empty
-            }
-
+            NetUtils::sendMessage(sendingSocket, token);
         }
 
 

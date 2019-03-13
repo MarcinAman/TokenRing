@@ -20,10 +20,10 @@ std::vector<std::string> StringUtils::split(std::string s, const std::string &de
     return vec;
 }
 
-std::string StringUtils::trim(std::string str) {
-    size_t first = str.find_first_not_of(' ');
+std::string StringUtils::trimEnter(std::string str) {
+    size_t first = str.find_first_not_of(13);
     if (first == std::string::npos)
         return "";
-    size_t last = str.find_last_not_of(' ');
+    size_t last = str.find_last_not_of(13);
     return str.substr(first, (last-first+1));
 }
