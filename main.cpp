@@ -17,7 +17,6 @@ int sendingSocket = -1;
 int receivingSocket = -1;
 int multicastSocket = -1;
 
-string multicastIP = "224.0.0.1";
 int multicast_port = 9999;
 
 void sendInitMessage(Input input){
@@ -53,6 +52,10 @@ void closeSockets(int s) {
     }
 }
 
+string getCurrentAddress(Input input){
+    return "127.0.0.1:"+to_string(input.listeningPort);
+}
+
 void atExit(){
     closeSockets(0);
 }
@@ -68,7 +71,7 @@ void initMulti(){
 void sendMulti(const string &toSend){
     struct sockaddr_in addr{};
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr(multicastIP.c_str());
+    addr.sin_addr.s_addr = inet_addr("224.1.1.1");
     addr.sin_port = htons(static_cast<uint16_t>(multicast_port));
 
     if (sendto(multicastSocket,toSend.c_str(), toSend.size(), 0, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
@@ -131,75 +134,93 @@ int main(int argc, char *argv[]) {
             token.fillFromString(response);
             std::cout << token.toString() << std::endl;
 
-            if(token.type() == INIT &&
-            (sendingSocket == -1 ||
-            token.getDestinationAddress() == input.neighbourIpAddess+":"+to_string(input.neighbourPort))){
-                std::string source = token.getSourceAddress();
-                //add to known hosts
+            sendMulti(input.toString());
 
-                std::vector<std::string> parsed = StringUtils::split(source,":");
+            if(token.getTTL() <= 0){
+                token.setType(EMPTY);
+            }
 
-                if(atoi(parsed.at(1).c_str()) != input.neighbourPort){
+            if(token.type() == INIT){
+                // there is a client that would like to send to my neighbour:
+                if(token.getDestinationAddress() == input.neighbourIpAddess+":"+to_string(input.neighbourPort)
+                && token.getDestinationAddress() != getCurrentAddress(input)){
+                    //update sending socket:
+
+                    std::string source = token.getData();
+
+                    std::vector<std::string> parsed = StringUtils::split(source,":");
+
                     knownHosts.push_back(source);
                     input.neighbourPort = atoi(parsed.at(1).c_str());
                     input.neighbourIpAddess = parsed.at(0);
-                    cout << "[INIT] changed sending ports to: " +  source << endl;
-                } else {
-                    cout << "init didnt change porst" << endl;
+
+                    cout << "[INIT1] changed sending ports to: " +  source << endl;
+                } else if(token.getDestinationAddress() == getCurrentAddress(input)){
+
+                    if(knownHosts.empty()){
+                        std::string source = token.getSourceAddress();
+
+                        std::vector<std::string> parsed = StringUtils::split(source,":");
+
+                        knownHosts.push_back(source);
+                        input.neighbourPort = atoi(parsed.at(1).c_str());
+                        input.neighbourIpAddess = parsed.at(0);
+
+                        cout << "[INIT2] changed sending ports to: " +  source << endl;
+                        token.setTTL(10);
+                        token.setType(EMPTY);
+
+                        token.setSourceAddress(getCurrentAddress(input));
+                    } else {
+                        //it is for me and i send it all around
+                        if(token.getDestinationAddress() == token.getSourceAddress()){
+                            // it was sent all around
+                            token.setType(EMPTY);
+                            token.setTTL(10);
+                            cout << "token returned from all around" << endl;
+                        } else {
+                            token.setData(token.getSourceAddress());
+                            knownHosts.push_back(token.getSourceAddress());
+                            token.setSourceAddress(token.getDestinationAddress());
+                            cout << "token send all around" << endl;
+                            token.setTTL(10);
+                        }
+                    }
                 }
+            } else if(token.type() == MSG) {
+                cout << "Got message: " + token.getData() << endl;
 
-                sendMulti(input.id);
-            } else if(token.type() == EMPTY || token.getTTL() <= 0){
-                    // empty, rand for sending
-                    // or ttl expired
-
+                token.setType(ACK);
+                token.setTTL(10);
+                string s = token.getDestinationAddress();
+                token.setDestinationAddress(token.getSourceAddress());
+                token.setSourceAddress(s);
+            } else if(token.type() ==  ACK) {
+                token.setType(EMPTY);
+                token.setTTL(10);
+                token.setSourceAddress(getCurrentAddress(input));
+            } else if(token.type() == EMPTY){
                     if(rand()%2 == 0){
                         cout << "Client "+ input.id + " decided to send message" << endl;
 
                         token.setData(to_string(rand()%10000));
                         token.setType(MSG);
                         token.setSourceAddress("127.0.0.1:"+to_string(input.listeningPort));
-
                         unsigned long index = rand() % knownHosts.size();
                         token.setDestinationAddress(knownHosts.at(index));
 
-                        cout << "sending message to: " + knownHosts.at(index) << endl;
-                        sendMulti(input.id);
-
-                    } else{
+                    } else {
                         cout << "Client "+ input.id + " decided to pass token" << endl;
                         token.setData("");
                         token.setType(EMPTY);
                     }
 
                     token.setTTL(10);
-                } else if(token.type() == INIT
-                && token.getDestinationAddress() == "127.0.0.1:"+to_string(input.listeningPort)){
-                //thats mine so i pass it
-                if(token.getDestinationAddress() == token.getSourceAddress()){
-                    token.setType(EMPTY);
-                    token.setTTL(10);
-                } else {
-                    knownHosts.push_back(token.getSourceAddress());
-                    token.setSourceAddress("127.0.0.1:"+to_string(input.listeningPort));
-                }
-            } else if(token.type() == MSG){
-                //Is it addressed to me?
-                if(token.getDestinationAddress() == "127.0.0.1:"+to_string(input.listeningPort)) {
-                    token.setType(ACK);
-                    token.setSourceAddress(token.getDestinationAddress());
-                    token.setDestinationAddress(token.getSourceAddress());
-                    token.setTTL(10);
-                    sendMulti(input.id);
-                }
-                // if no just ignore and pass with lower ttl
-            } else if(token.type() == ACK){
-                // So message got passed.
-                // Send an empty one so some1 can send theirs
-                token.setTTL(10);
-                token.setType(EMPTY);
 
+                } else {
+                cout << "Passed: " + token.toString() << endl;
             }
+
 
             int ttl = token.getTTL()-1;
             token.setTTL(ttl);
