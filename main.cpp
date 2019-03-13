@@ -17,8 +17,6 @@ int sendingSocket = -1;
 int receivingSocket = -1;
 int multicastSocket = -1;
 
-int multicast_port = 9999;
-
 void sendInitMessage(Input input){
     Token token;
     token.setData("INIT!");
@@ -72,11 +70,19 @@ void sendMulti(const string &toSend){
     struct sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr("224.1.1.1");
-    addr.sin_port = htons(static_cast<uint16_t>(multicast_port));
+    addr.sin_port = htons(5007);
 
-    if (sendto(multicastSocket,toSend.c_str(), toSend.size(), 0, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+    ssize_t multi = sendto(multicastSocket, "kurwaaaaa", 1024,
+                           MSG_CONFIRM, (const struct sockaddr *) &addr,
+                           sizeof(addr));
+
+    if (multi <= 0) {
         throw std::runtime_error("Failed to send sthing to multicastIP: " + string(strerror(errno)));
     }
+
+
+
+    cout << "log sent" << endl;
 }
 
 
