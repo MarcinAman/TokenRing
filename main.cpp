@@ -44,7 +44,7 @@
 int sendingSocket = -1;
 int receivingSocket = -1;
 
-void sendInitMessage(int sendingSocket, Input input){
+void sendInitMessage(Input input){
     Token token;
     token.setData("penis string is the best");
     token.setDestinationAddress(input.neighbourIpAddess+":"+to_string(input.neighbourPort));
@@ -52,9 +52,14 @@ void sendInitMessage(int sendingSocket, Input input){
     token.setType(INIT);
     token.setTTL(10);
 
+    sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess,
+                                               static_cast<uint16_t>(input.neighbourPort));
+
     NetUtils::sendMessage(sendingSocket, token);
 
     cout << "Init message sent" << endl;
+
+    close(sendingSocket);
 }
 
 void closeSockets(int s) {
@@ -97,13 +102,11 @@ int main(int argc, char *argv[]) {
 
 
     if(input.listeningPort != input.neighbourPort){
-        sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess,
-                                                   static_cast<uint16_t>(input.neighbourPort));
-        std::cout << "socket send: " + to_string(sendingSocket) << std::endl;
 
         knownHosts.push_back(input.neighbourIpAddess + ":" + to_string(input.neighbourPort));
 
-        sendInitMessage(sendingSocket, input);
+        sendInitMessage(input);
+        std::cout << "socket send: " + to_string(sendingSocket) << std::endl;
     }
 
     receivingSocket = NetUtils::socketForReceiving(input.protocol, static_cast<uint16_t>(input.listeningPort));
@@ -111,9 +114,16 @@ int main(int argc, char *argv[]) {
     std::cout << "socket recv: " + to_string(receivingSocket) << std::endl;
 
     char dataReceived[1024];
+    int tcpInSocket = -1;
 
     while(true){
-        ssize_t bytesRead = read(receivingSocket, &dataReceived, 1024);
+        tcpInSocket = accept(receivingSocket, NULL, NULL);
+
+        if(tcpInSocket < 0) {
+            throw std::runtime_error("Failed to accept: " + string(strerror(errno)));
+        }
+
+        ssize_t bytesRead = read(tcpInSocket, &dataReceived, 1024);
 
         if(bytesRead == -1){
             throw std::runtime_error("Failed to read from receiving socket: " + string(strerror(errno)));
@@ -125,20 +135,21 @@ int main(int argc, char *argv[]) {
             token.fillFromString(response);
             std::cout << token.toString() << std::endl;
 
-            if(token.type() == INIT && sendingSocket == -1){
+            if(token.type() == INIT && (sendingSocket == -1 || token.getDestinationAddress() == "127.0.0.1:"+to_string(input.listeningPort))){
                 std::string source = token.getSourceAddress();
+                //add to known hosts
                 knownHosts.push_back(source);
 
                 std::vector<std::string> parsed = StringUtils::split(source,":");
 
-                sendingSocket = NetUtils::socketForSending(input.protocol, parsed.at(0),
-                                                           static_cast<uint16_t>(atoi(parsed.at(1).c_str())));
-                token.setType(ACK);
-            } else if(token.type() == INIT){
-                // just send ack, nothing to do
-                // only add another host to stack
-                knownHosts.push_back(token.getSourceAddress());
+                //and change the way i send messages to proxy them through the new node:
+                input.neighbourPort = atoi(parsed.at(1).c_str());
+                input.neighbourIpAddess = parsed.at(0);
 
+                token.setType(ACK);
+            } else if(token.type() == INIT ){
+                //thats mine so i pass it
+                knownHosts.push_back(token.getSourceAddress());
             } else if(token.type() == DISCONNECT){
                 // check if the node that disconnected is our's destination.
                 // If so, update sending socket
@@ -202,10 +213,13 @@ int main(int argc, char *argv[]) {
 
             sleep(1);
 
+            sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess,
+                                                       static_cast<uint16_t>(input.neighbourPort));
+
             NetUtils::sendMessage(sendingSocket, token);
+
+            close(sendingSocket);
         }
-
-
     }
 
     return 0;

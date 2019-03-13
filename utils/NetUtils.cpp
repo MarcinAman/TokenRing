@@ -28,13 +28,6 @@ int NetUtils::socketForReceiving(Protocol protocol, uint16_t port) {
         throw std::runtime_error("Failed to listen: " + string(strerror(errno)));
     }
 
-    int addrLen = sizeof(address);
-    socketFD = accept(socketFD, (struct sockaddr *)&address, (socklen_t*)&addrLen);
-
-    if(socketFD < 0) {
-        throw std::runtime_error("Failed to accept: " + string(strerror(errno)));
-    }
-
     return socketFD;
 }
 
