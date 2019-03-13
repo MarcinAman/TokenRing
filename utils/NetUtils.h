@@ -25,7 +25,7 @@ class NetUtils {
         static int socketForReceiving(Protocol protocol, uint16_t port);
         static int socketForSending(Protocol protocol, string address, uint16_t port);
         
-        static void sendMessage(int socket, Token token);
+        static void sendMessage(int socket, Token token, Input input);
 };
 
 #endif //TOKENRING_SENDINGUTILS_H

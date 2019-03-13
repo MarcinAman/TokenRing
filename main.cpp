@@ -28,7 +28,7 @@ void sendInitMessage(Input input){
     sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess,
                                                static_cast<uint16_t>(input.neighbourPort));
 
-    NetUtils::sendMessage(sendingSocket, token);
+    NetUtils::sendMessage(sendingSocket, token, input);
 
     cout << "Init message sent" << endl;
 
@@ -69,11 +69,11 @@ void initMulti(){
 void sendMulti(const string &toSend){
     struct sockaddr_in addr{};
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr("224.1.1.1");
-    addr.sin_port = htons(5007);
+    addr.sin_addr.s_addr = inet_addr("224.0.0.1");
+    addr.sin_port = htons(9099);
 
-    ssize_t multi = sendto(multicastSocket, "kurwaaaaa", 1024,
-                           MSG_CONFIRM, (const struct sockaddr *) &addr,
+    ssize_t multi = sendto(multicastSocket, toSend.c_str(), 1024,
+                           0, (const struct sockaddr *) &addr,
                            sizeof(addr));
 
     if (multi <= 0) {
@@ -82,7 +82,7 @@ void sendMulti(const string &toSend){
 
 
 
-    cout << "log sent" << endl;
+    cout << "log sent: " + to_string(multi) << endl;
 }
 
 
@@ -121,22 +121,40 @@ int main(int argc, char *argv[]) {
     char dataReceived[1024];
     int tcpInSocket = -1;
 
+
+
     while(true){
         for (char &i : dataReceived) {
             i = 0;
         }
 
-        tcpInSocket = accept(receivingSocket, NULL, NULL);
+        ssize_t bytesRead = 0;
 
-        if(tcpInSocket < 0) {
-            throw std::runtime_error("Failed to accept: " + string(strerror(errno)));
+        if(input.protocol == TCP){
+            tcpInSocket = accept(receivingSocket, NULL, NULL);
+
+            if(tcpInSocket < 0) {
+                throw std::runtime_error("Failed to accept: " + string(strerror(errno)));
+            }
+
+            bytesRead = read(tcpInSocket, &dataReceived, 1024);
+
+            if(bytesRead == -1){
+                throw std::runtime_error("Failed to read from receiving socket: " + string(strerror(errno)));
+            }
+        } else {
+            struct sockaddr_in addr{};
+            addr.sin_family = AF_INET;
+            addr.sin_addr.s_addr = inet_addr(input.neighbourIpAddess.c_str());
+            addr.sin_port = htons(static_cast<uint16_t>(input.neighbourPort));
+
+            socklen_t s = sizeof(addr);
+
+            bytesRead = recvfrom(receivingSocket, &dataReceived, 1024,
+                     MSG_WAITALL, ( struct sockaddr *) &addr,
+                     &s);
         }
 
-        ssize_t bytesRead = read(tcpInSocket, &dataReceived, 1024);
-
-        if(bytesRead == -1){
-            throw std::runtime_error("Failed to read from receiving socket: " + string(strerror(errno)));
-        }
 
         if(bytesRead > 0){
             std::string response(dataReceived);
@@ -247,7 +265,7 @@ int main(int argc, char *argv[]) {
             sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess,
                                                        static_cast<uint16_t>(input.neighbourPort));
 
-            NetUtils::sendMessage(sendingSocket, token);
+            NetUtils::sendMessage(sendingSocket, token, input);
 
             close(sendingSocket);
         }
