@@ -8,11 +8,6 @@
 
 int createSocket(Protocol);
 
-void closeAndShutdownSocket(int socket){
-    shutdown(socket, SHUT_RDWR);
-    close(socket);
-}
-
 int NetUtils::socketForReceiving(Protocol protocol, uint16_t port) {
     int socketFD = createSocket(protocol);
 

@@ -6,7 +6,11 @@
 #include "utils/InputParser.h"
 #include "utils/NetUtils.h"
 #include <ctime>
+#include <sys/epoll.h>
 
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
 /*
  * 1. Wlacza sie 1 klient, dostaje swoj adress jako wejsciowy.
  * 2. Wlacza sie 2 klient i dostaje port poprzedniego nastepnie wysyla do niego token typu init.
@@ -50,14 +54,62 @@ void sendInitMessage(int sendingSocket, Input input){
     NetUtils::sendMessage(sendingSocket, token);
 }
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
-void receiveMessage(Input input) {
-    char dataReceived[1024];
+void closeSockets(int s) {
+    if(sendingSocket > 0){
+        shutdown(sendingSocket, SHUT_RDWR);
+        close(sendingSocket);
+    }
+    if(receivingSocket > 0){
+        shutdown(receivingSocket, SHUT_RDWR);
+        close(receivingSocket);
+    }
 
+    if(s != -1){
+        exit(0);
+    }
+}
+
+void atExit(){
+    closeSockets(0);
+}
+
+
+int main(int argc, char *argv[]) {
+    Input input = InputParser::parseArguments(argc, argv);
+
+    std::cout << "Initialized with parameters:" << std::endl;
+    std::cout << input.toString() << std::endl;
+
+    sighandler_t t = signal(SIGINT, closeSockets);
+
+    if(t == SIG_ERR){
+        throw std::runtime_error("Failed to register sighandler: " + string(strerror(errno)));
+    }
+
+    if(atexit(atExit) != 0){
+        throw std::runtime_error("Failed to register atexit: " + string(strerror(errno)));
+    }
+
+    if(input.listeningPort != input.neighbourPort){
+        sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess,
+                                                   static_cast<uint16_t>(input.neighbourPort));
+        std::cout << "socket send: " + to_string(sendingSocket) << std::endl;
+
+        sendInitMessage(sendingSocket, input);
+    }
+
+    receivingSocket = NetUtils::socketForReceiving(input.protocol, static_cast<uint16_t>(input.listeningPort));
+
+    std::cout << "socket recv: " + to_string(receivingSocket) << std::endl;
+
+    char dataReceived[1024];
 
     while(true){
         ssize_t bytesRead = read(receivingSocket, &dataReceived, 1024);
+
+        if(bytesRead == -1){
+            throw std::runtime_error("Failed to read from receiving socket: " + string(strerror(errno)));
+        }
 
         if(bytesRead > 0){
             std::string response(dataReceived);
@@ -71,99 +123,50 @@ void receiveMessage(Input input) {
                 std::vector<std::string> parsed = StringUtils::split(source,":");
 
                 sendingSocket = NetUtils::socketForSending(input.protocol, parsed.at(0),
-                        static_cast<uint16_t>(atoi(token.getSourceAddress().c_str())));
+                                                           static_cast<uint16_t>(atoi(parsed.at(1).c_str())));
                 token.setType(ACK);
 
                 sleep(1);
 
                 NetUtils::sendMessage(sendingSocket, token);
-            } else if(token.type() == INIT) {
-
+            } else if(token.type() == INIT){
+                // just send ack, nothing to do
+                // only add another host to stack
             } else if(token.type() == DISCONNECT){
-
+                // check if the node that disconnected is our's destination.
+                // If so, update sending socket
             } else if(token.type() == MSG){
-                if(token.getDestinationAddress() == "127.0.0.1:"+to_string(input.listeningPort)){
+                //Is it addressed to me?
+                if(token.getDestinationAddress() == "127.0.0.1:"+to_string(input.listeningPort)) {
                     token.setType(ACK);
                     token.setSourceAddress(token.getDestinationAddress());
                     token.setDestinationAddress(token.getSourceAddress());
-                } else {
-                    if(token.getTTL() == 0){
-                        token.setTTL(10);
-                        token.setType(MSG);
-                        token.setSourceAddress("127.0.0.1:"+to_string(input.listeningPort));
-                        token.setDestinationAddress(input.neighbourIpAddess);
-
-                        time_t wskaznik;
-                        time (&wskaznik);
-                        string currentTime= ctime (&wskaznik);
-
-                        token.setData(currentTime);
-                    }
-                  token.setTTL(token.getTTL()-1);
+                    token.setTTL(10);
                 }
+            } else if(token.type() == ACK){
+                // So message got passed.
+                // Send an empty one so some1 can send theirs
+            } else {
+                //empty, rand for sending
+            }
 
-                sleep(1);
+            int ttl = token.getTTL()-1;
+            token.setTTL(ttl);
 
+            sleep(1);
+
+            if(ttl > 0){
                 NetUtils::sendMessage(sendingSocket, token);
             } else {
-                //ACK
-
-                token.setType(MSG);
-                token.setSourceAddress(token.getDestinationAddress());
-                token.setDestinationAddress(token.getSourceAddress());
-
-                time_t t;
-                time (&t);
-                string currentTime= ctime (&t);
-
-                token.setData(currentTime);
-                token.setTTL(10);
-
-                sleep(1);
-                NetUtils::sendMessage(sendingSocket, token);
+                //woops timeout and send empty
             }
 
         }
-    }
 
-}
-#pragma clang diagnostic pop
 
-void closeSockets(int sig){
-    shutdown(sendingSocket, SHUT_RDWR);
-    close(sendingSocket);
-
-    shutdown(receivingSocket, SHUT_RDWR);
-    close(receivingSocket);
-
-    exit(0);
-}
-
-int main(int argc, char *argv[]) {
-    Input input = InputParser::parseArguments(argc, argv);
-
-    std::cout << "Initialized with parameters:" << std::endl;
-    std::cout << input.toString() << std::endl;
-
-    signal(SIGINT, closeSockets);
-
-    if(input.listeningPort == input.neighbourPort){
-        //this is first, we dont open sending socket because no one is listening
-        receivingSocket = NetUtils::socketForReceiving(input.protocol, static_cast<uint16_t>(input.listeningPort));
-        printf("socket recv: %d\n", receivingSocket);
-
-        receiveMessage(input);
-    } else {
-        //other nodes
-
-        sendingSocket = NetUtils::socketForSending(input.protocol, input.neighbourIpAddess, static_cast<uint16_t>(input.neighbourPort));
-        printf("sending socket: %d\n", sendingSocket);
-
-        sendInitMessage(sendingSocket, input);
-
-        receivingSocket = NetUtils::socketForReceiving(input.protocol, static_cast<uint16_t>(input.listeningPort));
-        receiveMessage(input);
     }
 
     return 0;
 }
+
+#pragma clang diagnostic pop
