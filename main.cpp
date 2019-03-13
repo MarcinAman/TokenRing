@@ -43,7 +43,7 @@ void sendInitMessage(int sendingSocket, Input input){
     Token token;
     token.setData("penis string is the best");
     token.setDestinationAddress(input.neighbourIpAddess+":"+to_string(input.neighbourPort));
-    token.setSourceAddress(std::to_string(input.listeningPort));
+    token.setSourceAddress(input.neighbourIpAddess+":"+std::to_string(input.listeningPort));
     token.setType(INIT);
     token.setTTL(10);
 
@@ -66,9 +66,10 @@ void receiveMessage(Input input) {
             std::cout << token.toString() << std::endl;
 
             if(token.type() == INIT && sendingSocket == -1){
-                std::string destination = token.getDestinationAddress();
+                std::string source = token.getSourceAddress();
 
-                std::vector<std::string> parsed = StringUtils::split(destination,":");
+                std::vector<std::string> parsed = StringUtils::split(source,":");
+
                 sendingSocket = NetUtils::socketForSending(input.protocol, parsed.at(0),
                         static_cast<uint16_t>(atoi(token.getSourceAddress().c_str())));
                 token.setType(ACK);
@@ -81,7 +82,7 @@ void receiveMessage(Input input) {
             } else if(token.type() == DISCONNECT){
 
             } else if(token.type() == MSG){
-                if(token.getDestinationAddress() == "127:0:0:1"+to_string(input.listeningPort)){
+                if(token.getDestinationAddress() == "127.0.0.1:"+to_string(input.listeningPort)){
                     token.setType(ACK);
                     token.setSourceAddress(token.getDestinationAddress());
                     token.setDestinationAddress(token.getSourceAddress());
@@ -89,7 +90,7 @@ void receiveMessage(Input input) {
                     if(token.getTTL() == 0){
                         token.setTTL(10);
                         token.setType(MSG);
-                        token.setSourceAddress("127:0:0:1"+to_string(input.listeningPort));
+                        token.setSourceAddress("127.0.0.1:"+to_string(input.listeningPort));
                         token.setDestinationAddress(input.neighbourIpAddess);
 
                         time_t wskaznik;
@@ -111,9 +112,9 @@ void receiveMessage(Input input) {
                 token.setSourceAddress(token.getDestinationAddress());
                 token.setDestinationAddress(token.getSourceAddress());
 
-                time_t wskaznik;
-                time (&wskaznik);
-                string currentTime= ctime (&wskaznik);
+                time_t t;
+                time (&t);
+                string currentTime= ctime (&t);
 
                 token.setData(currentTime);
                 token.setTTL(10);
